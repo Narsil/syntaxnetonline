@@ -1,0 +1,117 @@
+{% load bootstrap3 %}
+<html>
+    <head>
+        <style>
+            .word{
+                margin:5px;
+                padding:5px;
+                border: 1px solid black;
+                display:inline-block;
+            }
+            .word.hover{
+                background:#ccc;
+            }
+            .container{
+                margin-top: 30px;
+            }
+        </style>
+    </head>
+    <body>
+    <div class="container">
+        <div class="row">
+            <div class="col-md-4">
+                <form action="." method="post" class="form-horizontal">
+                {% csrf_token %}
+                {% bootstrap_form form layout="horizontal" %}
+                </form>
+            </div>
+            <div class="col-md-8">
+                <div id="results">
+                </div>
+            </div>
+        </div>
+    </div>
+    </body>
+    <link rel="stylesheet" type="text/css" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css"/>
+    <script type="text/javascript" src="https://code.jquery.com/jquery-3.1.1.min.js"></script>
+    <script type="text/javascript" src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+    <script>
+        var popover_stack = [];
+        var get_syntaxnet = function(){
+            var data = $('form').serialize();
+            $.post('.', data, function(syntaxdata){
+                    var result = $('#results');
+                    result.empty();
+                    var spans = [];
+                    $.each(syntaxdata, function(index, word){
+                        var span = $('<span></span>').addClass('word');
+                        var content = $('<div></div>');
+                        span.text(word[1]);
+                        $.each(word[5], function(func_type, func_value){
+                            var row = $('<div></div>').append(
+                                $('<strong></strong>').text(func_type + " :"),
+                                $('<span></span>').text(func_value)
+                            );
+                            content.append(row);
+                        });
+                        span.popover({
+                            trigger: 'manual',
+                            placement: 'bottom',
+                            title: word[3],
+                            html: true,
+                            content: content,
+                        }).on('mouseenter', function(e){
+                            if (popover_stack.length !== 0){
+                                var to_hide = popover_stack[popover_stack.length - 1];
+                                to_hide.popover('hide');
+                                to_hide.removeClass('hover');
+                            }
+                            $(this).popover('show');
+                            $(this).addClass('hover');
+
+                            popover_stack.push($(this));
+                        }).on('mouseleave', function(e){
+                            $(this).popover('hide')
+                            $(this).removeClass('hover');
+                            popover_stack = popover_stack.slice(0, -1);
+                            if (popover_stack.length !== 0){
+                                var to_show = popover_stack[popover_stack.length - 1];
+                                to_show.popover('show');
+                                to_show.addClass('hover');
+                            }
+
+                        });
+                        spans.push(span);
+
+                    });
+
+                    var root_span;
+                    $.each(syntaxdata, function(index, word){
+                        var dep = word[6];
+                        if (dep == 0){
+                            root_span = spans[index];
+                        }else{
+                            var span_dep = spans[dep-1];
+                            var span_child = spans[index];
+                            if (index < dep -1){
+                                $.each($(span_dep).contents(), function(i, node){
+                                    if (node.nodeType == 3){
+                                        $(span_child).insertBefore(node);
+                                    }
+                                });
+                            }else{
+                                span_dep.append(span_child);
+                            }
+
+                        }
+                    });
+
+                    result.append(root_span);
+            });
+        };
+        $(document).ready(function(){
+            $('form').change(function(){get_syntaxnet();});
+            get_syntaxnet();
+        });
+    </script>
+</html>
